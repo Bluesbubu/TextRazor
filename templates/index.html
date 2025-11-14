@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen VL 图像文字提取</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-section, .output-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .section-title {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            background: #ecf0f1;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            background: #d6dbdf;
+            border-color: #2980b9;
+        }
+
+        .upload-area i {
+            font-size: 3em;
+            color: #3498db;
+            margin-bottom: 15px;
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+
+        .question-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            font-size: 1em;
+            margin-bottom: 15px;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .checkbox-group {
+            margin: 15px 0;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, #2980b9, #1f6397);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .output-content {
+            background: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            padding: 15px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+
+        .thinking-section, .answer-section {
+            margin-bottom: 20px;
+        }
+
+        .thinking-title, .answer-title {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .answer-title {
+            color: #27ae60;
+        }
+
+        .thinking-content, .answer-content {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #e74c3c;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .answer-content {
+            border-left-color: #27ae60;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .status.processing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.completed {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>小马哥的图像文字提取</h1>
+            <p>基于 Qwen3-VL-Plus 的多模态AI图像识别与文字提取工具</p>
+        </div>
+
+        <div class="content">
+            <div class="input-section">
+                <h2 class="section-title">输入</h2>
+
+                <!-- 图片上传区域 -->
+                <div class="upload-area" id="uploadArea">
+                    <i>📁</i>
+                    <h3>点击上传图片或拖拽到此区域</h3>
+                    <p>支持 JPG, PNG, WEBP 格式</p>
+                    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- 图片预览 -->
+                <img id="previewImage" class="preview-image" alt="预览图片">
+
+                <!-- URL输入 -->
+                <div>
+                    <h4>或输入图片URL:</h4>
+                    <input type="url" id="imageUrl" class="url-input" placeholder="https://example.com/image.jpg">
+                    <button onclick="processUrl()" class="btn">使用URL</button>
+                </div>
+
+                <!-- 问题输入 -->
+                <div style="margin-top: 20px;">
+                    <h4>问题描述:</h4>
+                    <textarea id="question" class="question-input" placeholder="请输入您的问题，例如：请提取图片中的文字内容">请提取图片中的文字内容</textarea>
+                </div>
+
+                <!-- 选项 -->
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="enableThinking">
+                        <span>启用思考过程显示</span>
+                    </label>
+                </div>
+
+                <!-- 操作按钮 -->
+                <button onclick="extractText()" class="btn" id="extractBtn">开始提取文字</button>
+            </div>
+
+            <div class="output-section">
+                <h2 class="section-title">输出结果</h2>
+
+                <!-- 状态显示 -->
+                <div id="status" class="status" style="display: none;"></div>
+
+                <!-- 加载动画 -->
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>正在处理中，请稍候...</p>
+                </div>
+
+                <!-- 思考过程 -->
+                <div class="thinking-section">
+                    <div class="thinking-title">思考过程:</div>
+                    <div id="thinkingContent" class="thinking-content" style="display: none;"></div>
+                </div>
+
+                <!-- 回答内容 -->
+                <div class="answer-section">
+                    <div class="answer-title">提取结果:</div>
+                    <div id="answerContent" class="answer-content">请上传图片并点击"开始提取文字"按钮</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentImageData = null;
+
+        // 上传区域点击事件
+        document.getElementById('uploadArea').addEventListener('click', () => {
+            document.getElementById('imageInput').click();
+        });
+
+        // 图片选择事件
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                uploadImage(file);
+            }
+        });
+
+        // 拖拽功能
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.background = '#d6dbdf';
+            uploadArea.style.borderColor = '#2980b9';
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.background = '#ecf0f1';
+            uploadArea.style.borderColor = '#3498db';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.background = '#ecf0f1';
+            uploadArea.style.borderColor = '#3498db';
+
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                uploadImage(file);
+            } else {
+                alert('请上传图片文件！');
+            }
+        });
+
+        // 上传图片
+        async function uploadImage(file) {
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const response = await fetch('/api/upload-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentImageData = result.image_data;
+
+                    // 显示预览
+                    const preview = document.getElementById('previewImage');
+                    preview.src = currentImageData;
+                    preview.style.display = 'block';
+
+                    alert('图片上传成功！');
+                } else {
+                    alert('上传失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('上传错误: ' + error.message);
+            }
+        }
+
+        // 处理URL
+        async function processUrl() {
+            const url = document.getElementById('imageUrl').value.trim();
+            if (!url) {
+                alert('请输入图片URL');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/process-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentImageData = result.image_data;
+
+                    // 显示预览
+                    const preview = document.getElementById('previewImage');
+                    preview.src = currentImageData;
+                    preview.style.display = 'block';
+
+                    alert('URL处理成功！');
+                } else {
+                    alert('处理失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('处理错误: ' + error.message);
+            }
+        }
+
+        // 提取文字
+        async function extractText() {
+            if (!currentImageData) {
+                alert('请先上传图片或输入图片URL');
+                return;
+            }
+
+            const question = document.getElementById('question').value.trim() || '请提取图片中的文字内容';
+            const enableThinking = document.getElementById('enableThinking').checked;
+
+            // 重置显示
+            document.getElementById('thinkingContent').style.display = 'none';
+            document.getElementById('answerContent').textContent = '正在处理...';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('extractBtn').disabled = true;
+
+            try {
+                const response = await fetch('/api/extract-text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: currentImageData,
+                        question: question,
+                        enable_thinking: enableThinking
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('请求失败: ' + response.status);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6);
+                            if (data) {
+                                try {
+                                    const result = JSON.parse(data);
+                                    updateOutput(result);
+                                } catch (e) {
+                                    console.log('解析JSON失败:', e);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error('提取错误:', error);
+                document.getElementById('status').textContent = '错误: ' + error.message;
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').style.display = 'block';
+                document.getElementById('answerContent').textContent = '处理失败，请重试';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('extractBtn').disabled = false;
+            }
+        }
+
+        // 更新输出
+        function updateOutput(data) {
+            // 更新状态
+            if (data.status) {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = getStatusText(data.status);
+                statusEl.className = 'status ' + data.status;
+                statusEl.style.display = 'block';
+            }
+
+            // 更新思考过程
+            if (data.reasoning_content) {
+                const thinkingEl = document.getElementById('thinkingContent');
+                thinkingEl.textContent = data.reasoning_content;
+                thinkingEl.style.display = 'block';
+            }
+
+            // 更新回答内容
+            if (data.answer_content !== undefined) {
+                document.getElementById('answerContent').textContent = data.answer_content;
+            }
+
+            // 滚动到底部
+            const outputContent = document.getElementById('answerContent');
+            outputContent.scrollTop = outputContent.scrollHeight;
+
+            const thinkingContent = document.getElementById('thinkingContent');
+            thinkingContent.scrollTop = thinkingContent.scrollHeight;
+        }
+
+        // 获取状态文本
+        function getStatusText(status) {
+            const statusMap = {
+                'thinking': '思考中...',
+                'answering': '生成回答中...',
+                'completed': '完成',
+                'error': '发生错误'
+            };
+            return statusMap[status] || status;
+        }
+    </script>
+</body>
+</html>
